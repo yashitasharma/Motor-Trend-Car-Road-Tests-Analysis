@@ -1,0 +1,319 @@
+---
+title: "Assignment-3: *Yashita Sharma*"
+format: 
+  html: 
+    toc: true
+    toc_float: true
+  pdf: default
+  docx: default
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+# Motor Trend Car Road Tests Analysis Report
+
+Assignment 3 is based on: Motor Trend Car Road Tests.
+
+### **Introduction**
+
+In order to examine the link between different predictor factors and automobiles' miles per gallon (mpg), a linear regression analysis on the mtcars dataset in this report. Goal is to comprehend how several elements affect an automobile's fuel efficiency, including weight, horsepower, cylinder count, and transmission type (am).
+
+**Data Source:** The mtcars dataset, which is part of the basic R package, was used for this investigation. It includes details on thirty-two different cars' various specs, such as mpg, hp, wt, cyl, and am.
+
+### **Project Objectives:**
+
+\# Examine the connections between weight, horsepower, number of cylinders, type of transmission, and miles per gallon.
+
+\# Create a linear regression model using the above predictor variables to forecast mpg.
+
+\# Analyze the model's effectiveness and compare the anticipated and observed values.
+
+### **Techniques**
+
+\
+Data Preparation: We define the response variable (mpg) and the predictor variables (mpcars dataset).\
+Model Specification: Using the tidymodels framework, we specify a linear regression model that includes the predictor variables listed in the formula.\
+Model Fitting: Using the lm() engine, we fit the linear regression model to the data.\
+Model Evaluation: Using the dotwhisker package, we visualize the regression results and evaluate the performance of the model.\
+Prediction: then create predictions for the first five rows of the data, which is a portion of the total data, and then plot the actual data points against the forecasts.
+
+### **Characteristic Statistics**
+
+For every variable in the dataset, the summary(mtcars) function returns descriptive statistics, such as mean, median, minimum, maximum, and quartiles. We can see a broad picture of each variable's distribution and value range thanks to these data.\
+Histograms:\
+Three variables are plotted with histograms: miles per gallon (mpg), weight (wt), and horsepower (hp). Based on the quantity of cylinders (cyl), each histogram has a different color. Various hues correspond to varying numbers of cylinders. With the help of these histograms, we can see how each variable is distributed and identify any variations in distribution among cylinder count levels.\
+
+```{r, echo=FALSE}
+# Load necessary libraries
+library(broom)
+library(tidyverse)
+library(tidymodels)
+tidymodels_prefer()
+library(dotwhisker)
+
+# Load the mtcars dataset
+data(mtcars)
+
+# Descriptive statistics
+summary(mtcars)
+
+
+mtcars %>%
+  ggplot(aes(x = hp, fill = factor(cyl))) +
+  geom_histogram(binwidth = 10, position = "identity", alpha = 0.7) +
+  labs(title = "Histogram of Horsepower by Cylinder Count",
+       x = "Horsepower", y = "Frequency", fill = "Cylinder Count") +
+  theme_minimal()
+
+mtcars %>%
+  ggplot(aes(x = wt, fill = factor(cyl))) +
+  geom_histogram(binwidth = 0.5, position = "identity", alpha = 0.7) +
+  labs(title = "Histogram of Weight by Cylinder Count",
+       x = "Weight", y = "Frequency", fill = "Cylinder Count") +
+  theme_minimal()
+
+mtcars %>%
+  ggplot(aes(x = mpg, fill = factor(cyl))) +
+  geom_histogram(binwidth = 2, position = "identity", alpha = 0.7) +
+  labs(title = "Histogram of MPG by Cylinder Count",
+       x = "Miles per Gallon", y = "Frequency", fill = "Cylinder Count") +
+  theme_minimal()
+
+# Check for missing values
+sum(is.na(mtcars))
+
+# Detect outliers using boxplots
+mtcars %>%
+  gather(key = "variable", value = "value", -cyl, -am) %>%
+  ggplot(aes(x = factor(cyl), y = value, fill = factor(cyl))) +
+  geom_boxplot() +
+  facet_wrap(~ variable, scales = "free_y") +
+  theme_minimal()
+
+```
+
+**Absent Values:**\
+The code uses sum(is.na(mtcars)) to verify the dataset for missing values. There is missing data in the dataset if the total of the missing values is more than zero.\
+**Data Quality and Outliers:**\
+Boxplots are used to show the distribution of values for each variable (hp, wt, mpg) over various cylinder count (cyl) levels and to identify outliers.\
+Boxplots reveal details about the data's dispersion, central tendency, and any outliers.\
+These boxplots allow us to see any extreme numbers or problems with the quality of the data that may require more research.\
+In conclusion, the information on the mtcars dataset's distribution, quality, and interrelationships between variables, facilitating preliminary data exploration and comprehension.
+
+### **Automobile's fuel efficiency**
+
+Here aim is to investigate the correlations between weight, horsepower, cylinder count, and transmission type—all factors that have an impact on an automobile's fuel efficiency. To quantify the links between these variables, the code computes a correlation matrix. A heatmap is then used to display the correlations.
+
+```{r, echo=FALSE}
+# Load necessary libraries
+library(tidyverse)
+
+# Load the mtcars dataset
+data(mtcars)
+
+# Compute correlation matrix
+correlation_matrix <- cor(mtcars[c("mpg", "hp", "wt", "cyl", "am")])
+
+# Convert correlation matrix to tidy format
+tidy_correlation <- as.data.frame(as.table(correlation_matrix))
+colnames(tidy_correlation) <- c("Var1", "Var2", "Correlation")
+
+# Plot heatmap
+heatmap <- ggplot(data = tidy_correlation, aes(x = Var1, y = Var2)) +
+  geom_tile(aes(fill = Correlation), color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limits = c(-1, 1), name = "Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))
+
+# Print the heatmap
+print(heatmap)
+
+
+```
+
+The heatmap shows us the following observations: Positive Correlations: Red-colored variables that have a positive correlation tend to rise or fall together. For instance, a positive relationship between weight and horsepower implies that engines in bigger cars are typically more potent. Negative Correlations: An inverse link is indicated by variables with a negative correlation (blue tints). For example, a negative weight-to-miles-per-gallon (mpg) connection indicates that larger cars often have lower fuel efficiency. Weak Correlations: Less significant correlations between the variables are shown by cells with lighter hues, or those that are closer to white.
+
+### **Linear regression model to predict mpg**
+
+To predict mpg based on predictor factors, create a linear regression model and use a violin plot to show the model's performance.
+
+```{r, echo=FALSE}
+# Load necessary libraries
+library(broom)
+library(tidyverse)
+library(tidymodels)
+tidymodels_prefer()
+library(dotwhisker)
+
+# Load the mtcars dataset
+data(mtcars)
+
+# Build linear regression model
+lm_model <- lm(mpg ~ hp + wt + as.factor(cyl), data = mtcars)
+
+# Extract model predictions and residuals
+predictions <- predict(lm_model)
+residuals <- residuals(lm_model)
+
+# Combine predictions and residuals with original data
+model_data <- mtcars %>%
+  mutate(predictions = predictions, residuals = residuals)
+
+# Plot violin plot for residuals
+ggplot(model_data, aes(x = as.factor(cyl), y = residuals, fill = as.factor(cyl))) +
+  geom_violin() +
+  labs(title = "Residuals Violin Plot by Cylinder Count",
+       x = "Cylinder Count", y = "Residuals") +
+  theme_minimal()
+
+
+```
+
+The distribution of residuals, or the gap between expected and observed mpg values, is shown on the violin plot for every transmission type level (manual or automatic).We anticipate that the residuals will have a symmetric distribution and be centered around zero if the linear regression model adequately describes the data.When there are considerable deviations between the model's predictions and the observed values, it is indicated by observations with big positive or negative residuals.We can determine whether the model performs differently for each type of transmission by comparing the residuals distributions for manual and automatic transmissions. In general, the violin plot aids in our assessment of how well the linear regression model predicts mpg using the chosen predictor variables.
+
+### **Model's Performance**
+
+To compare the observed and predicted values visually and assess the model's performance
+
+```{r, echo=FALSE}
+# Load necessary libraries
+library(broom)
+library(tidyverse)
+library(tidymodels)
+tidymodels_prefer()
+library(dotwhisker)
+
+# Load the mtcars dataset
+data(mtcars)
+
+# Prepare the Data
+predictors <- c("hp", "wt", "cyl", "am")  # Predictor variables
+target <- "mpg"                            # Target variable
+
+# Build the Linear Regression Model
+lm_model <- lm(mpg ~ ., data = mtcars[, c(predictors, target)])
+
+# Predict mpg
+mtcars_predicted <- augment(lm_model, data = mtcars)
+
+# Visualize Observed vs. Predicted Values
+ggplot(mtcars_predicted, aes(x = mpg, y = .fitted)) +
+  geom_point(color = "black") +
+  geom_abline(slope = 1, intercept = 0, color = "blue", linetype = "dashed") +
+  labs(title = "Observed vs. Predicted MPG",
+       x = "Observed MPG", y = "Predicted MPG") +
+  theme_minimal()
+
+```
+
+**Interpretation:**The model overestimated the MPG figure in the cases indicated by points above the dashed line. Instances when the model underestimated the MPG value are indicated by points below the dashed line. The distribution and spread of points surrounding the dashed line show how accurate and variable the model's predictions are. The model's predictions appear to be consistent over the range of observed values if the points are dispersed evenly along the line. The points may indicate possible places where the model is overfitting or underperforming if they are concentrated or grouped in particular directions away from the line.\
+**Evaluation of the Model:**\
+We can qualitatively assess how well the model represents the link between predictor variables (such horsepower, weight, cylinder count, and transmission type) and MPG by visually examining the scatter plot. A model that performs well and produces accurate predictions is indicated by a plot that has a strong linear relationship and tightly grouped dots around the dashed line. On the other hand, the plot displays a dispersed pattern with points that are distant from the dashed line, it may indicate that the model needs to be improved by adjusting the predictor selection or taking into account more sophisticated modeling methods.\
+
+### Results
+
+The response variable (mpg) and the predictor variables (hp, wt, cyl, and am) have a substantial association, according to the regression analysis. The model fits the data satisfactorily, accounting for a significant amount of the volatility in mpg. Forecast values are in good agreement with actual data points, indicating that the algorithm can reasonably estimate fuel economy.
+
+# [**Build and Fit Another Model to the Data**]{.underline}
+
+Using the mtcars dataset, this code does two independent analyses: Random Forest regression and Bayesian linear regression. Let's examine the results and the conclusions that may be made from each analysis:
+
+**Bayesian Linear Regression:**
+
+Summary of the Bayesian Model: The summary gives details about the posterior means, standard deviations, and 95% credible intervals for the model coefficients. It also contains model fit metrics like the Bayesian R-squared and the Deviance Information Criterion (DIC). Plot of Posterior Distributions: The posterior distributions of the model parameters are shown in this plot. It enables us to examine the degree of uncertainty corresponding to each estimate of the coefficient visually.
+
+```{r, echo=FALSE}
+#load necessary libraries
+library(brms)
+
+# Load conflicted package
+library(conflicted)
+
+# Set preference for the brms version of ar function
+conflicts_prefer("brms::ar")
+
+# Fit a Bayesian linear regression model
+# Specify the model formula
+formula <- mpg ~ hp + wt + as.factor(cyl) + as.factor(am)
+
+# Fit the Bayesian linear regression model
+bayesian_model <- brm(formula, data = mtcars)
+
+# Print the summary of the Bayesian model
+summary(bayesian_model)
+
+# Plot the posterior distributions of model parameters
+plot(bayesian_model)
+
+# Load necessary libraries
+library(tidyverse)
+library(tidymodels)
+tidymodels_prefer()
+library(broom.mixed)
+library(ranger)  # For Random Forest
+library(dotwhisker)
+
+# Define a Random Forest model specification
+rf_spec <- rand_forest() %>%
+  set_engine("ranger")  # Use ranger engine for Random Forest
+
+# Fit the Random Forest model
+model_fit_rf <- rf_spec %>%
+  fit(formula, data = mtcars)
+
+# Print the summary of the model
+summary(model_fit_rf)
+
+# Plot the regression results
+dwplot(model_fit_rf)
+
+# Augment the dataset with predictions
+augmented_data_rf <- augment(model_fit_rf)
+
+# Plot the observed data points and predicted values
+ggplot(augmented_data_rf, aes(x = hp, y = .fitted)) +
+  geom_point(color = "black") +
+  geom_line(aes(y = .fitted), color = "blue", linetype = "dashed") +
+  labs(x = "Horsepower", y = "Predicted Miles per Gallon") +
+  ggtitle("Random Forest: Observed vs. Predicted MPG")
+
+```
+
+### 
+
+**Random Forest Regression:**
+
+\
+An overview of the Random Forest Model The number of trees, the mtry (number of variables randomly picked as candidates at each split), and other performance metrics for the Random Forest model, like the Mean Squared Error (MSE) and the Out-of-Bag (OOB) error rate, are all included in the summary.\
+Results of the Regression Plot: A plot of the regression findings, including the observed data points and the projected values, is produced by the dwplot() function. The observed data is represented by the black points in this figure, while the Random Forest model's projected values are shown by the blue dashed line. Visual assessment of the model's accuracy in describing the correlation between the predictor variables (like horsepower) and the outcome variable (like miles per gallon)
+
+The Random Forest model was selected in compliance with the directive to experiment with a different model outside of Bayesian inference. Although Bayesian inference is an effective modeling technique, the decision to investigate an alternative model was motivated by the aim of expanding knowledge about the range of modeling approaches that are possible inside the Tidymodels framework. There are several clear benefits associated with Random Forests, including the ability to handle non-linear relationships, capture interactions, and efficiently handle high-dimensional data. We chose Random Forests in order to compare its performance with the Bayesian model we learned in class and obtain insights into its workings. This will help me better comprehend various modeling techniques.
+
+We can learn more about the links between the predictor factors (weight, cylinder count, horsepower, and transmission type) and the outcome variable (miles per gallon) by looking at the results of both studies. Additionally, we are able to assess each model's performance and contrast its advantages and disadvantages in terms of outcome variable prediction.
+
+**Referenced terms:**
+
+For error resolution referenced Generative AI.
+
+1.  **mpg**: Miles per gallon (fuel efficiency).
+
+2.  **cyl**: Number of cylinders.
+
+3.  **disp**: Displacement (engine size) in cubic inches.
+
+4.  **hp**: Horsepower.
+
+5.  **drat**: Rear axle ratio.
+
+6.  **wt**: Weight (in 1000 lbs).
+
+7.  **qsec**: Quarter mile time (in seconds).
+
+8.  **vs**: Engine (0 = V-shaped, 1 = straight).
+
+9.  **am**: Transmission type (0 = automatic, 1 = manual).
+
+10. **gear**: Number of forward gears.
+
+11. **carb**: Number of carburetors.
